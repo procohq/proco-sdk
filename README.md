@@ -1,6 +1,6 @@
 # @proco/sdk
 
-**Financial infrastructure for AI agents.** Wallets · payment policies · programmable spending · agent-to-agent settlement · treasury.
+**Programmable USDC settlement infrastructure for on-chain capital markets.** Capital accounts · treasury controls · programmable settlement · multi-chain execution.
 
 [![npm version](https://img.shields.io/npm/v/@proco/sdk.svg)](https://www.npmjs.com/package/@proco/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](https://opensource.org/licenses/MIT)
@@ -10,9 +10,9 @@
 
 ## What is Proco?
 
-AI agents are making decisions that cost real money — paying for APIs, buying compute, settling agent-to-agent tasks, and managing budgets across long-running workflows. Today none of that has financial infrastructure behind it.
+On-chain capital markets are generating over $170B in monthly perpetual volume — but the settlement infrastructure beneath them is still primitive. There are no programmable conditions on USDC flows, no institutional treasury controls, no non-custodial capital accounts built for trading desks and protocol treasuries.
 
-Proco is the payment layer built purely for agents: programmable wallets, policy enforcement, x402-native payment execution, and full audit trails — without any of the overhead designed for humans.
+Proco is the Layer 4 programmable settlement infrastructure: USDC capital accounts with spending policies, position limits, and counterparty controls — enforced on-chain, across Hyperliquid, Base, and Solana.
 
 ## Installation
 
@@ -31,12 +31,12 @@ const proco = new Proco({
   apiKey: process.env.PROCO_API_KEY
 })
 
-// Create a wallet for your agent
+// Create a capital account
 const wallet = await proco.wallets.create({
   agentId: 'research-agent-01',
   policies: {
-    dailyCap: 50_00,           // $50.00 per day
-    vendors:  ['openai.com', 'perplexity.ai', 'serper.dev'],
+    dailyCap: 50_00, // $50.00 per day
+    vendors: ['openai.com', 'perplexity.ai', 'serper.dev'],
     currency: 'USDC'
   }
 })
@@ -44,30 +44,30 @@ const wallet = await proco.wallets.create({
 // Execute a payment — x402 handled automatically
 const tx = await proco.payments.create({
   wallet: wallet.id,
-  amount: 2_50,                // $2.50
+  amount: 2_50, // $2.50
   vendor: 'api.perplexity.ai',
-  memo:   'market research query'
+  memo: 'market research query'
 })
 
-console.log(tx.status)        // 'settled'
-console.log(tx.settlementMs)  // ~28000 (p99)
+console.log(tx.status) // 'settled'
+console.log(tx.settlementMs) // ~28000 (p99)
 ```
 
 ## Core concepts
 
-### Agent wallets
+### Capital accounts
 
-Each agent (or agent role) gets its own wallet with its own policy set. Wallets are non-custodial: Proco never holds funds — it enforces policies and executes payments on behalf of the agent.
+Each principal (trading desk, protocol treasury, or automated system) gets its own capital account with its own policy set. Accounts are non-custodial: Proco never holds funds — it enforces policies and executes on-chain settlement.
 
 ```typescript
 const wallet = await proco.wallets.create({
   agentId: 'procurement-agent',
   policies: {
-    dailyCap:    100_00,        // $100 / day hard limit
-    perTx:       25_00,         // $25 / transaction max
-    categories:  ['data', 'compute', 'research'],
-    vendors:     ['approved-vendor.com'],
-    allowUnknown: false         // reject unlisted vendors
+    dailyCap: 100_00, // $100 / day hard limit
+    perTx: 25_00, // $25 / transaction max
+    categories: ['data', 'compute', 'research'],
+    vendors: ['approved-vendor.com'],
+    allowUnknown: false // reject unlisted vendors
   }
 })
 ```
@@ -79,40 +79,36 @@ Policies are evaluated in real time before every payment. If a payment would bre
 ```typescript
 // Update policies at any time
 await proco.wallets.updatePolicy(wallet.id, {
-  dailyCap: 200_00,            // increase limit
+  dailyCap: 200_00, // increase limit
   addVendors: ['new-api.com']
 })
 ```
 
 ### x402 payments
 
-x402 is the open HTTP standard for machine-to-machine payments. When an API returns HTTP 402, Proco intercepts the payment challenge, validates it against the agent's policy, and executes the payment — returning the settled request back to your agent.
+x402 is the open HTTP standard for machine-to-machine payments. When an API returns HTTP 402, Proco intercepts the payment challenge, validates it against the account's policy, and executes the payment — returning the settled request back to your system.
 
 ```typescript
 // Fetch any x402-protected endpoint — payment is automatic
 const response = await proco.fetch('https://api.perplexity.ai/search', {
   wallet: wallet.id,
-  body:   JSON.stringify({ query: 'latest AI news' })
+  body: JSON.stringify({ query: 'latest AI news' })
 })
-
 const data = await response.json()
 ```
 
-### Agent-to-agent settlement
+### Programmatic settlement
 
-When one agent commissions work from another, Proco handles the settlement atomically.
+When one principal commissions work from another, Proco handles the settlement atomically.
 
 ```typescript
 const invoice = await proco.invoices.create({
   from: 'worker-agent-07',
-  to:   'orchestrator-agent-01',
+  to: 'orchestrator-agent-01',
   amount: 5_00,
   description: 'PDF extraction task #4821'
 })
-
-await proco.invoices.settle(invoice.id, {
-  wallet: orchestratorWallet.id
-})
+await proco.invoices.settle(invoice.id, { wallet: orchestratorWallet.id })
 ```
 
 ## Framework integrations
@@ -125,7 +121,6 @@ import { ProcoPaymentTool } from '@proco/sdk/langchain'
 const tools = [
   new ProcoPaymentTool({ wallet: wallet.id, proco })
 ]
-
 const agent = await createOpenAIFunctionsAgent({ llm, tools, prompt })
 ```
 
@@ -133,8 +128,8 @@ const agent = await createOpenAIFunctionsAgent({ llm, tools, prompt })
 
 | Environment | Base URL | Notes |
 |-------------|----------|-------|
-| Sandbox     | `https://sandbox.api.procohq.com` | Free testnet USDC, no real money |
-| Production  | `https://api.procohq.com`         | Real USDC on Base                |
+| Sandbox | `https://sandbox.api.procohq.com` | Free testnet USDC, no real money |
+| Production | `https://api.procohq.com` | Real USDC on Base |
 
 ```typescript
 const proco = new Proco({
